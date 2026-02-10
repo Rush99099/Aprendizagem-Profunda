@@ -191,7 +191,7 @@ def testreg():
     logmodel.printCoefs()
 
     print (logmodel.costFunction())
-    logmodel.optim_model_reg(0.1)
+    logmodel.optim_model_reg(0.000001)
     logmodel.printCoefs()
     print (logmodel.costFunction())
     logmodel.plotModel2()    
