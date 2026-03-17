@@ -10,6 +10,9 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 import matplotlib.pyplot as plt
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
 # Path to the data
 data_dir = os.path.join(os.path.dirname(__file__), "aclImdb")
 print("Data dir:", data_dir)
@@ -230,28 +233,27 @@ def load_glove_embeddings(glove_path, word_index, embed_dim):
 
 ## Model training
 
-def train(model, train_loader, val_loader, criterion, epochs = 5, lr = 0.001, verbose = True):
-    ## verbose - print losses and accuracies per epoch
-    
-    train_accs = []
-    val_accs = []
-    train_losses = []
-    val_losses = []
-    
+def train(model, train_loader, val_loader, criterion, epochs=5, lr=0.001, verbose=True):
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Ensure model is on GPU
     model.to(device)
+    
+    train_accs, val_accs, train_losses, val_losses = [], [], [], []
     
     for epoch in range(epochs): 
         model.train()
         for x, y in train_loader:
+            # MOVE DATA TO GPU HERE
+            x, y = x.to(device), y.to(device)
+            
             optimizer.zero_grad()
             outputs = model(x)
             loss = criterion(outputs, y)
             loss.backward()
             optimizer.step()
 
+        # Evaluate also needs to handle device movement
         train_loss, train_acc = evaluate(model, train_loader, criterion)
         val_loss, val_acc = evaluate(model, val_loader, criterion)
         
@@ -261,9 +263,7 @@ def train(model, train_loader, val_loader, criterion, epochs = 5, lr = 0.001, ve
         val_losses.append(val_loss)
 
         if verbose: 
-            print(f"Epoch {epoch+1}")
-            print(f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
-            print(f"Val   Loss: {val_loss:.4f}, Val   Acc: {val_acc:.4f}")
+            print(f"Epoch {epoch+1} | Train Loss: {train_loss:.4f}, Acc: {train_acc:.4f} | Val Loss: {val_loss:.4f}, Acc: {val_acc:.4f}")
     
     return train_accs, val_accs, train_losses, val_losses
 
@@ -275,6 +275,9 @@ def evaluate(model, loader, criterion):
 
     with torch.no_grad():
         for x, y in loader:
+            # MOVE DATA TO GPU HERE
+            x, y = x.to(device), y.to(device)
+            
             outputs = model(x)
             loss = criterion(outputs, y)
             total_loss += loss.item()
@@ -456,9 +459,12 @@ def test_ffnn():
     filespath = data_dir
     max_words = 20000
     train_loader, val_loader, test_loader = load_dataset(filespath, max_words)
-    model = FFNN(max_words, topology = [100], dropout = 0.5)
+    
+    # Properly initialize and move to device
+    model = FFNN(max_words, topology=[100], dropout=0.5).to(device)
+    
     criterion = nn.BCELoss()
-    train(model, train_loader, val_loader, criterion, epochs = 10)
+    train(model, train_loader, val_loader, criterion, epochs=10)
     _, test_acc = evaluate(model, test_loader, criterion)
     print(f"Test Accuracy: {test_acc:.4f}")
 
@@ -540,11 +546,11 @@ def test_gru():
     _, test_acc = evaluate(model, test_loader, criterion)
     print(f"Test Accuracy: {test_acc:.4f}")
 
-#test_log_reg()
-#test_ffnn()
-#test_tf_idf()
-#test_embed()
-#test_embed_pretr()
-#test_rnn()  
+test_log_reg()
+test_ffnn()
+test_tf_idf()
+test_embed()
+test_embed_pretr()
+test_rnn()  
 test_lstm()
-#test_gru()
+test_gru()
